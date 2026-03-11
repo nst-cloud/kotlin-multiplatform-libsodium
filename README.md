@@ -9,6 +9,9 @@ Libsodium bindings project uses libsodium c sources and libsodium.js to provide 
 While this library is just a wrapper around the well known Libsodium library it still comes with high potential of introducing new
 attack surfaces, bugs and other issues and you shouldn't use it in production until it has been reviewed by community. 
 
+## LLM/AI Contributions
+We do not accept AI-generated or AI-assisted contributions at this time.
+
 ## Installation
 
 #### Gradle
