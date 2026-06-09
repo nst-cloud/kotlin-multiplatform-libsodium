@@ -10,7 +10,7 @@ While this library is just a wrapper around the well known Libsodium library it 
 attack surfaces, bugs and other issues and you shouldn't use it in production until it has been reviewed by community. 
 
 ## LLM/AI Contributions
-We do not accept AI-generated or AI-assisted contributions at this time.
+We do not accept AI (LLM) generated or AI (LLM) assisted contributions at this time.
 
 ## Installation
 
