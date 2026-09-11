@@ -42,7 +42,7 @@ allprojects {
     }
 }
 
-group = "com.ionspin.kotlin"
+group = resolvePublishGroup(project)
 
 
 apply {

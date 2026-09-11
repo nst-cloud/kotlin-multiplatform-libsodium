@@ -1,10 +1,12 @@
 import org.gradle.api.NamedDomainObjectContainer
+import org.gradle.api.Project
 import org.gradle.nativeplatform.platform.internal.Architectures
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinDependencyHandler
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import java.io.File
+import java.util.Properties
 
 /**
  * Created by Ugljesa Jovanovic
@@ -12,6 +14,32 @@ import java.io.File
  * on 30-May-2020
  */
 fun isInIdea() = System.getProperty("idea.active") == "true"
+
+/**
+ * Loads local.properties from the root of the project, if it exists, so that machine specific settings,
+ * like publishing credentials and signing keys, can be kept out of version control.
+ */
+fun loadLocalProperties(rootDir: File): Properties {
+    val properties = Properties()
+    val localPropertiesFile = File(rootDir, "local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { properties.load(it) }
+    }
+    return properties
+}
+
+/**
+ * Resolves the Maven group to publish under, in order of precedence: gradle property, environment variable,
+ * local.properties, falling back to [ReleaseInfo.group].
+ */
+fun resolvePublishGroup(project: Project): String {
+    val localProperties = loadLocalProperties(project.rootDir)
+    return listOfNotNull(
+        project.findProperty("publishGroup")?.toString(),
+        System.getenv("PUBLISH_GROUP"),
+        localProperties.getProperty("publishGroup")
+    ).map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: ReleaseInfo.group
+}
 
 fun isInGitlabCi() = System.getenv("GITLAB_CI") == "true"
 

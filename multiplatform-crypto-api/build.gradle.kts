@@ -28,7 +28,7 @@ plugins {
 repositories {
     mavenCentral()
 }
-group = ReleaseInfo.group
+group = resolvePublishGroup(project)
 version = "0.1" //Irrelevant
 
 val ideaActive = System.getProperty("idea.active") == "true"

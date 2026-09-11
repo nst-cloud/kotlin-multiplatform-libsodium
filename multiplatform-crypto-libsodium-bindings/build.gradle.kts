@@ -35,12 +35,31 @@ plugins {
 val sonatypeStaging = "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
 val sonatypeSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
 
-val sonatypePassword: String? by project
+val localProperties = loadLocalProperties(rootProject.rootDir)
 
-val sonatypeUsername: String? by project
+/**
+ * Resolves a publishing secret, in order of precedence: gradle property, environment variable, local.properties.
+ */
+fun secret(propertyName: String, environmentVariableName: String): String? =
+    listOfNotNull(
+        project.findProperty(propertyName)?.toString(),
+        System.getenv(environmentVariableName),
+        localProperties.getProperty(propertyName)
+    ).map { it.trim() }.firstOrNull { it.isNotEmpty() }
 
-val sonatypePasswordEnv: String? = System.getenv()["SONATYPE_PASSWORD"]
-val sonatypeUsernameEnv: String? = System.getenv()["SONATYPE_USERNAME"]
+val sonatypeUsername: String? = secret("sonatypeUsername", "SONATYPE_USERNAME")
+val sonatypePassword: String? = secret("sonatypePassword", "SONATYPE_PASSWORD")
+
+val signingKeyId: String? = secret("signing.keyId", "SIGNING_KEY_ID")
+val signingPassword: String? = secret("signing.password", "SIGNING_PASSWORD")
+val signingSecretKeyRingFile: String? = secret("signing.secretKeyRingFile", "SIGNING_SECRET_KEY_RING_FILE")
+
+// Ascii armored key, for machines where dropping a keyring file is impractical, takes precedence over the keyring
+val signingSecretKey: String? = secret("signing.secretKey", "SIGNING_SECRET_KEY")
+    ?: secret("signing.secretKeyFile", "SIGNING_SECRET_KEY_FILE")
+        ?.let { file(it) }
+        ?.takeIf { it.exists() }
+        ?.readText()
 
 repositories {
     mavenCentral()
@@ -50,7 +69,7 @@ repositories {
     }
 
 }
-group = ReleaseInfo.group
+group = resolvePublishGroup(project)
 version = ReleaseInfo.bindingsVersion
 
 val ideaActive = isInIdea()
@@ -752,7 +771,18 @@ allprojects {
 
 
 signing {
-    isRequired = false
+    when {
+        signingSecretKey != null -> useInMemoryPgpKeys(signingKeyId, signingSecretKey, signingPassword)
+        signingSecretKeyRingFile != null -> {
+            // The signing plugin picks the keyring up through project properties only
+            signingKeyId?.let { extra["signing.keyId"] = it }
+            signingPassword?.let { extra["signing.password"] = it }
+            extra["signing.secretKeyRingFile"] = signingSecretKeyRingFile
+        }
+    }
+    // Maven central rejects unsigned releases, snapshots don't have to be signed
+    isRequired = (signingSecretKey != null || signingSecretKeyRingFile != null) &&
+            !version.toString().endsWith("SNAPSHOT")
     sign(publishing.publications)
 }
 
@@ -790,8 +820,8 @@ publishing {
 
             url = uri(sonatypeStaging)
             credentials {
-                username = sonatypeUsername ?: sonatypeUsernameEnv ?: ""
-                password = sonatypePassword ?: sonatypePasswordEnv ?: ""
+                username = sonatypeUsername ?: ""
+                password = sonatypePassword ?: ""
             }
         }
 
@@ -799,8 +829,8 @@ publishing {
             name = "snapshot"
             url = uri(sonatypeSnapshots)
             credentials {
-                username = sonatypeUsername ?: sonatypeUsernameEnv ?: ""
-                password = sonatypePassword ?: sonatypePasswordEnv ?: ""
+                username = sonatypeUsername ?: ""
+                password = sonatypePassword ?: ""
             }
         }
     }
