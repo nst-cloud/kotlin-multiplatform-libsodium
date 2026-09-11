@@ -1,0 +1,54 @@
+#!/bin/sh
+# Enforce project commit message conventions:
+#  - no Co-Authored-By trailer (author is the user only)
+#  - single line, no body, max 255 chars
+#  - no "feat"/"feature" prefix
+#  - "[upgrade]" prefix must state old -> new version
+
+msg_file="$1"
+
+# Drop comment lines and everything below the `git commit -v` scissors line, so a
+# staged diff or a template that merely mentions the trailer does not trip this.
+cleaned=$(sed -e '/^# *-\{1,\} >8 -\{1,\}/,$d' -e '/^#/d' "$msg_file")
+
+# Drop trailing blank lines so a trailing newline doesn't count as a body.
+trimmed=$(printf '%s\n' "$cleaned" | sed -e '${/^$/d}')
+
+if printf '%s\n' "$cleaned" | grep -qiE '^[[:space:]]*Co-Authored-By:'; then
+    echo "commit-msg: Co-Authored-By is not allowed in a commit message." >&2
+    echo "" >&2
+    printf '%s\n' "$cleaned" | grep -inE '^[[:space:]]*Co-Authored-By:' \
+        | sed 's/^/  line /' >&2
+    echo "" >&2
+    echo "Author is the user only. Remove the line, then commit again." >&2
+    exit 1
+fi
+
+line_count=$(printf '%s\n' "$trimmed" | grep -cve '^[[:space:]]*$')
+if [ "$line_count" -gt 1 ]; then
+    echo "commit-msg: commit message must be a single line, no body." >&2
+    echo "" >&2
+    echo "Got:" >&2
+    printf '%s\n' "$trimmed" | sed 's/^/  /' >&2
+    exit 1
+fi
+
+subject=$(printf '%s\n' "$trimmed" | head -n1)
+
+len=$(printf '%s' "$subject" | wc -c)
+if [ "$len" -gt 255 ]; then
+    echo "commit-msg: commit message is $len chars, max is 255." >&2
+    exit 1
+fi
+
+if printf '%s' "$subject" | grep -qiE '^\[?(feat|feature)\]?[:[:space:]]'; then
+    echo "commit-msg: no \"feat\"/\"feature\" prefix, use a plain description instead." >&2
+    exit 1
+fi
+
+if printf '%s' "$subject" | grep -qiE '^\[upgrade\]' && ! printf '%s' "$subject" | grep -qE -- '->'; then
+    echo "commit-msg: [upgrade] commits must state old -> new version, e.g. [upgrade] foo 1.2.3 -> 1.4.0" >&2
+    exit 1
+fi
+
+exit 0

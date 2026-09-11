@@ -9,9 +9,12 @@ import org.khronos.webgl.Uint8Array
  * ugljesa.jovanovic@ionspin.com
  * on 27-May-2020
  */
-@JsModule("libsodium-wrappers-sumo")
-@JsNonModule
-external object JsSodiumInterface {
+// libsodium-wrappers-sumo's ESM build has exactly one export, `export default`, no named exports.
+// `external object` + `@JsModule` compiles to a namespace import, which against a default-export-only
+// ESM module yields only `{ default: ... }` - see the identical note on `LibsodiumSumoModule` in
+// libsodium.kt. `external interface` + a plain `external val` compiles to a default import instead,
+// matching this module's actual shape without changing anything at the CommonJS-target call sites.
+external interface JsSodiumInterfaceApi {
 
 
     @JsName("crypto_generichash")
@@ -472,3 +475,7 @@ external object JsSodiumInterface {
     //
     // ---- Ed25519 end ----
 }
+
+@JsModule("libsodium-wrappers-sumo")
+@JsNonModule
+external val JsSodiumInterface: JsSodiumInterfaceApi
